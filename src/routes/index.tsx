@@ -154,7 +154,7 @@ function PromptLens() {
     const options = SURPRISE_IDEAS.filter((s) => s !== idea);
     const pick = options[Math.floor(Math.random() * options.length)]!;
     setIdea(pick);
-    void generate({ idea: pick });
+    toast.success(`Idea mil gaya: "${pick}" — ab Generate dabao!`);
   };
 
   const copyPrompt = async (text: string, index: number | "all") => {
@@ -317,7 +317,7 @@ function PromptLens() {
                       setIdea(h.idea);
                       setModel(h.model);
                       setStyle(h.style);
-                      void generate({ idea: h.idea, model: h.model, style: h.style });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className={`flex min-h-9 items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 ${focusRing}`}
                   >
