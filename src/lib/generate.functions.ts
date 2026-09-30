@@ -16,6 +16,7 @@ export const generatePrompts = createServerFn({ method: "POST" })
     try {
       const { generateIdeasWithAI } = await import("./generate.server");
       const ideas = await generateIdeasWithAI(data);
+      console.log("AI generation succeeded:", ideas.length, "ideas");
       return { ideas, source: "ai" };
     } catch (error) {
       console.error("AI generation failed, falling back to templates:", error);
