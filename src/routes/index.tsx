@@ -91,7 +91,7 @@ function PromptLens() {
   };
 
   const surprise = () => {
-    const pick = SURPRISE_IDEAS[Math.floor(Math.random() * SURPRISE_IDEAS.length)];
+    const pick = SURPRISE_IDEAS[Math.floor(Math.random() * SURPRISE_IDEAS.length)]!;
     setIdea(pick);
   };
 

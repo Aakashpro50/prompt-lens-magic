@@ -62,7 +62,7 @@ const STYLE_MODIFIERS: Record<StyleName, { look: string; lighting: string; mood:
 };
 
 function buildPrompt(idea: string, style: StyleName, model: ModelId, angleIndex: number): IdeaPrompt {
-  const angle = ANGLES[angleIndex % ANGLES.length];
+  const angle = ANGLES[angleIndex % ANGLES.length]!;
   const mod = STYLE_MODIFIERS[style];
   const ideaText = angle.label(idea);
 
