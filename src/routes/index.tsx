@@ -317,7 +317,7 @@ function PromptLens() {
                       setIdea(h.idea);
                       setModel(h.model);
                       setStyle(h.style);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      window.scrollTo({ top: 0, behavior: "auto" });
                     }}
                     className={`flex min-h-9 items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 ${focusRing}`}
                   >
@@ -394,8 +394,8 @@ function PromptLens() {
               {results.map((item, i) => (
                 <article
                   key={`${lastRun?.variation}-${i}`}
-                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5"
-                  style={{ animationDelay: `${i * 90}ms` }}
+                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5 [content-visibility:auto] [contain-intrinsic-size:auto_320px]"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
