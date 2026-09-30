@@ -67,12 +67,12 @@ function buildPrompt(idea: string, style: StyleName | null, model: ModelId, angl
   const mod = STYLE_MODIFIERS[style ?? styleKeys[(angleIndex + variation) % styleKeys.length]!];
   const ideaText = angle.label(idea);
 
-  const base = `${angle.shot.charAt(0).toUpperCase() + angle.shot.slice(1)} of ${idea}. ${mod.look}. Lighting: ${mod.lighting}. Camera: ${angle.camera}. Mood: ${mod.mood}. Rich fine detail, careful composition, professional quality.`;
+  const base = `${angle.shot.charAt(0).toUpperCase() + angle.shot.slice(1)} of ${idea}. ${mod.look}. Lighting: ${mod.lighting}. Camera: ${angle.camera}. Mood: ${mod.mood}.`;
 
   let prompt: string;
   switch (model) {
     case "midjourney":
-      prompt = `${angle.shot} of ${idea}, ${mod.look}, ${mod.lighting}, ${angle.camera}, ${mod.mood} mood, intricate detail, award-winning photography --ar 16:9 --style raw --v 6`;
+      prompt = `${angle.shot} of ${idea}, ${mod.look}, ${mod.lighting}, ${angle.camera}, ${mod.mood} mood --ar 16:9 --style raw --v 6`;
       break;
     case "gpt-image":
       prompt = `Create an image: ${base} Render any visible text cleanly and accurately.`;
