@@ -22,7 +22,8 @@ const MODEL_GUIDANCE: Record<ModelId, string> = {
 export async function generateIdeasWithAI(input: {
   idea: string;
   model: ModelId;
-  style: StyleName;
+  style: StyleName | null;
+  variation?: number;
 }): Promise<IdeaPrompt[]> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -43,7 +44,7 @@ Rules:
 - Each "prompt" is complete and detailed: subject, environment, lighting, camera angle/lens, mood and detail keywords. Genuinely high quality, never generic filler.
 - Prompts are always in English, even if the input idea is Hindi/Hinglish.
 - ${MODEL_GUIDANCE[input.model]}
-- Apply the "${input.style}" style to every prompt.
+- ${input.style ? `Apply the "${input.style}" style to every prompt.` : "No fixed style: choose the most fitting visual style for each concept."}
 - Respond with ONLY valid JSON, no markdown fences: {"ideas":[{"idea":"...","prompt":"..."},{"idea":"...","prompt":"..."},{"idea":"...","prompt":"..."},{"idea":"...","prompt":"..."}]}`;
 
   const result = streamText({
@@ -52,7 +53,7 @@ Rules:
     messages: [
       {
         role: "user",
-        content: `Idea: "${input.idea}". Target model: ${input.model}. Style: ${input.style}. Return the JSON now.`,
+        content: `Idea: "${input.idea}". Target model: ${input.model}. Style: ${input.style ?? "any (your choice)"}.${input.variation ? ` This is regeneration #${input.variation}: give 4 completely fresh concepts, different from the obvious first take.` : ""} Return the JSON now.`,
       },
     ],
     providerOptions: {
