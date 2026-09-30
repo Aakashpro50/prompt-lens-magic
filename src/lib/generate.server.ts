@@ -48,8 +48,8 @@ Rules:
 
   const result = streamText({
     model: provider.responses(MODEL),
+    system,
     messages: [
-      { role: "system", content: system },
       {
         role: "user",
         content: `Idea: "${input.idea}". Target model: ${input.model}. Style: ${input.style}. Return the JSON now.`,
