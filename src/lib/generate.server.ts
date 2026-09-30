@@ -24,6 +24,7 @@ export async function generateIdeasWithAI(input: {
   model: ModelId;
   style: StyleName | null;
   variation?: number;
+  avoid?: string[];
 }): Promise<IdeaPrompt[]> {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -41,7 +42,9 @@ export async function generateIdeasWithAI(input: {
 Rules:
 - The 4 concepts must take different angles: a close-up/detail, a wide/establishing shot, a creative or surreal twist, and an emotional/story-driven version.
 - Each "idea" is ONE line describing a specific, interesting image worth creating.
-- Each "prompt" is complete and detailed: subject, environment, lighting, camera angle/lens, mood and detail keywords. Genuinely high quality, never generic filler.
+- Each "prompt" is focused and vivid (roughly 45-80 words): subject, environment, lighting, camera angle, mood and a few precise detail keywords.
+- Mention a lens at most once and only when useful. Do NOT pile on filler like "ultra detailed, 8k, film grain, intricate textures, hyperrealistic, sharp focus" or repeated texture words.
+- Keep every scene physically plausible and renderable in a single frame: no contradictory lighting, no impossible simultaneous camera angles, no demands for exact counts of tiny objects or long legible text blocks.
 - Prompts are always in English, even if the input idea is Hindi/Hinglish.
 - ${MODEL_GUIDANCE[input.model]}
 - ${input.style ? `Apply the "${input.style}" style to every prompt.` : "No fixed style: choose the most fitting visual style for each concept."}
@@ -53,7 +56,7 @@ Rules:
     messages: [
       {
         role: "user",
-        content: `Idea: "${input.idea}". Target model: ${input.model}. Style: ${input.style ?? "any (your choice)"}.${input.variation ? ` This is regeneration #${input.variation}: give 4 completely fresh concepts, different from the obvious first take.` : ""} Return the JSON now.`,
+        content: `Idea: "${input.idea}". Target model: ${input.model}. Style: ${input.style ?? "any (your choice)"}.${input.variation ? ` This is regeneration #${input.variation}: invent 4 COMPLETELY NEW concepts with different subjects, settings, characters and situations — not the same scenes with minor tweaks.` : ""}${input.avoid && input.avoid.length ? ` Do NOT reuse or lightly rephrase any of these earlier concepts: ${input.avoid.map((a) => `"${a}"`).join("; ")}.` : ""} Return the JSON now.`,
       },
     ],
     providerOptions: {

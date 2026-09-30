@@ -33,7 +33,12 @@ interface HistoryEntry {
   idea: string;
   model: ModelId;
   style: StyleName | null;
+  ideas?: IdeaPrompt[];
+  variation?: number;
 }
+
+const sameEntry = (a: HistoryEntry, b: HistoryEntry) =>
+  a.idea.toLowerCase() === b.idea.toLowerCase() && a.model === b.model && a.style === b.style;
 
 interface Settings {
   model: ModelId;
@@ -115,7 +120,7 @@ function PromptLens() {
 
   const saveHistory = (entry: HistoryEntry) => {
     setHistory((prev) => {
-      const next = [entry, ...prev.filter((h) => h.idea.toLowerCase() !== entry.idea.toLowerCase())].slice(0, 8);
+      const next = [entry, ...prev.filter((h) => !sameEntry(h, entry))].slice(0, 8);
       writeJSON(HISTORY_KEY, next);
       return next;
     });
@@ -126,7 +131,7 @@ function PromptLens() {
     writeJSON(HISTORY_KEY, []);
   };
 
-  const generate = async (opts?: { idea?: string; model?: ModelId; style?: StyleName | null; variation?: number }) => {
+  const generate = async (opts?: { idea?: string; model?: ModelId; style?: StyleName | null; variation?: number; avoid?: string[] }) => {
     const finalIdea = (opts?.idea ?? idea).trim();
     const finalModel = opts?.model ?? model;
     const finalStyle = opts?.style !== undefined ? opts.style : style;
@@ -138,11 +143,11 @@ function PromptLens() {
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 50);
     try {
       const res = await generatePrompts({
-        data: { idea: finalIdea, model: finalModel, style: finalStyle, variation },
+        data: { idea: finalIdea, model: finalModel, style: finalStyle, variation, avoid: opts?.avoid ?? [] },
       });
       setResults(res.ideas);
       setLastRun({ idea: finalIdea, model: finalModel, style: finalStyle, variation });
-      saveHistory({ idea: finalIdea, model: finalModel, style: finalStyle });
+      saveHistory({ idea: finalIdea, model: finalModel, style: finalStyle, ideas: res.ideas, variation });
     } catch {
       setError("Kuch gadbad ho gayi — generation failed. Please try again.");
     } finally {
@@ -311,18 +316,26 @@ function PromptLens() {
                 const hm = MODELS.find((m) => m.id === h.model);
                 return (
                   <button
-                    key={h.idea}
+                    key={`${h.idea}-${h.model}-${h.style}`}
                     disabled={loading}
                     onClick={() => {
                       setIdea(h.idea);
                       setModel(h.model);
                       setStyle(h.style);
-                      window.scrollTo({ top: 0, behavior: "auto" });
+                      setError(null);
+                      if (h.ideas && h.ideas.length > 0) {
+                        setResults(h.ideas);
+                        setLastRun({ idea: h.idea, model: h.model, style: h.style, variation: h.variation ?? 0 });
+                        setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 50);
+                      } else {
+                        window.scrollTo({ top: 0, behavior: "auto" });
+                      }
                     }}
                     className={`flex min-h-9 items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 ${focusRing}`}
                   >
                     {h.idea}
                     {hm && <span className="text-[10px] uppercase tracking-wider text-primary">{hm.short}</span>}
+                    {h.style && <span className="text-[10px] text-muted-foreground">{h.style}</span>}
                   </button>
                 );
               })}
@@ -352,7 +365,13 @@ function PromptLens() {
                   <div className="flex gap-2">
                     <button
                       onClick={() =>
-                        void generate({ ...lastRun, variation: lastRun.variation + 1 })
+                        void generate({
+                          idea: lastRun.idea,
+                          model,
+                          style,
+                          variation: lastRun.variation + 1,
+                          avoid: results.map((r) => r.idea),
+                        })
                       }
                       className={`flex min-h-9 items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 ${focusRing}`}
                     >
@@ -426,9 +445,7 @@ function PromptLens() {
                       )}
                     </button>
                   </div>
-                  <pre className="mt-4 max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-code p-4 font-mono text-[13px] leading-relaxed text-code-foreground">
-                    {item.prompt}
-                  </pre>
+                  <PromptBlock text={item.prompt} />
                 </article>
               ))}
             </div>
@@ -440,6 +457,34 @@ function PromptLens() {
           <p className="mt-2">PromptLens · Banaya gaya pyaar se · Free forever, no accounts</p>
         </footer>
       </div>
+    </div>
+  );
+}
+
+function PromptBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 280;
+  return (
+    <div className="mt-4">
+      <pre
+        className={`relative whitespace-pre-wrap break-words rounded-xl border border-border bg-code p-4 font-mono text-[13px] leading-relaxed text-code-foreground ${
+          long && !open ? "max-h-40 overflow-hidden" : ""
+        }`}
+      >
+        {text}
+        {long && !open && (
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-14 rounded-b-xl bg-gradient-to-t from-code to-transparent" />
+        )}
+      </pre>
+      {long && (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className={`mt-2 rounded text-xs font-semibold text-primary hover:underline ${focusRing}`}
+        >
+          {open ? "Show less" : "Show full prompt"}
+        </button>
+      )}
     </div>
   );
 }
