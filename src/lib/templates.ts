@@ -35,7 +35,7 @@ const STYLE_MODIFIERS: Record<StyleName, { look: string; lighting: string; mood:
     mood: "quiet, authentic, lived-in",
   },
   Cinematic: {
-    look: "cinematic film still, anamorphic lens flare, subtle film grain, teal-and-amber grade",
+    look: "cinematic film still, teal-and-amber grade",
     lighting: "dramatic low-key lighting with a single motivated key light",
     mood: "tense, atmospheric, larger than life",
   },

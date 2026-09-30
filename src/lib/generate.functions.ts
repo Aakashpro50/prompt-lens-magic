@@ -10,6 +10,7 @@ const InputSchema = z.object({
   model: z.enum(["gpt-image", "gemini", "midjourney", "flux"]),
   style: z.enum(STYLES).nullable(),
   variation: z.number().int().min(0).max(1000).default(0),
+  avoid: z.array(z.string().max(300)).max(24).default([]),
 });
 
 export const generatePrompts = createServerFn({ method: "POST" })

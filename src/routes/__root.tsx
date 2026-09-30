@@ -128,7 +128,7 @@ function RootComponent() {
       <main>
         <Outlet />
       </main>
-      <Toaster position="bottom-center" theme="dark" />
+      <Toaster position="top-center" theme="dark" />
     </QueryClientProvider>
   );
 }
