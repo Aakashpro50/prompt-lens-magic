@@ -135,7 +135,7 @@ function PromptLens() {
     setLoading(true);
     setError(null);
     setResults([]);
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 50);
     try {
       const res = await generatePrompts({
         data: { idea: finalIdea, model: finalModel, style: finalStyle, variation },
