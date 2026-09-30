@@ -190,7 +190,7 @@ function PromptLens() {
         </header>
 
         {/* Input */}
-        <section className="mt-8 animate-fade-up sm:mt-10" style={{ animationDelay: "80ms" }}>
+        <section className="mt-8 sm:mt-10">
           <label htmlFor="idea" className="sr-only">
             Your idea
           </label>
