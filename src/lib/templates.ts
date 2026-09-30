@@ -61,9 +61,10 @@ const STYLE_MODIFIERS: Record<StyleName, { look: string; lighting: string; mood:
   },
 };
 
-function buildPrompt(idea: string, style: StyleName, model: ModelId, angleIndex: number): IdeaPrompt {
+function buildPrompt(idea: string, style: StyleName | null, model: ModelId, angleIndex: number, variation: number): IdeaPrompt {
   const angle = ANGLES[angleIndex % ANGLES.length]!;
-  const mod = STYLE_MODIFIERS[style];
+  const styleKeys = Object.keys(STYLE_MODIFIERS) as StyleName[];
+  const mod = STYLE_MODIFIERS[style ?? styleKeys[(angleIndex + variation) % styleKeys.length]!];
   const ideaText = angle.label(idea);
 
   const base = `${angle.shot.charAt(0).toUpperCase() + angle.shot.slice(1)} of ${idea}. ${mod.look}. Lighting: ${mod.lighting}. Camera: ${angle.camera}. Mood: ${mod.mood}. Rich fine detail, careful composition, professional quality.`;
@@ -87,6 +88,11 @@ function buildPrompt(idea: string, style: StyleName, model: ModelId, angleIndex:
   return { idea: ideaText, prompt };
 }
 
-export function generateFromTemplates(idea: string, style: StyleName, model: ModelId): IdeaPrompt[] {
-  return [0, 1, 2, 3].map((i) => buildPrompt(idea, style, model, i));
+export function generateFromTemplates(
+  idea: string,
+  style: StyleName | null,
+  model: ModelId,
+  variation = 0,
+): IdeaPrompt[] {
+  return [0, 1, 2, 3].map((i) => buildPrompt(idea, style, model, i, variation));
 }
