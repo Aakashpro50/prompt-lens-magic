@@ -178,7 +178,7 @@ function PromptLens() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-28 pt-10 sm:pb-24 sm:pt-16">
+      <div className="mx-auto w-full max-w-2xl px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-10 sm:pb-24 sm:pt-16">
         {/* Header */}
         <header className="animate-fade-up">
           <div className="flex items-center gap-2 text-primary">
@@ -276,7 +276,7 @@ function PromptLens() {
           </div>
 
           {/* Generate — sticky on mobile */}
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background p-3 sm:static sm:mt-8 sm:border-0 sm:p-0">
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mt-8 sm:border-0 sm:p-0">
             <button
               onClick={() => void generate()}
               disabled={!idea.trim() || loading}
@@ -350,7 +350,7 @@ function PromptLens() {
         )}
 
         {/* Results */}
-        <section ref={resultsRef} aria-live="polite" aria-busy={loading} className="scroll-mt-6">
+        <section ref={resultsRef} aria-live="polite" aria-busy={loading} className="scroll-mt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0">
           {showResultsArea && (
             <div className="mt-12 space-y-5">
               {results.length > 0 && lastRun && lastModel && (
@@ -468,7 +468,7 @@ function PromptBlock({ text }: { text: string }) {
     <div className="mt-4">
       <pre
         className={`relative whitespace-pre-wrap break-words rounded-xl border border-border bg-code p-4 font-mono text-[13px] leading-relaxed text-code-foreground ${
-          long && !open ? "max-h-40 overflow-hidden" : ""
+          long ? (open ? "max-h-none overflow-visible" : "max-h-40 overflow-hidden") : ""
         }`}
       >
         {text}
