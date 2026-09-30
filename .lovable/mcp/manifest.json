@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.4",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "promptspark-studio",
+      "version": "0.1.0",
+      "title": "PromptSpark Studio"
+    },
+    "tools": [
+      {
+        "name": "generate_image_prompts",
+        "title": "Generate image prompts",
+        "description": "Turn a short 1-2 word idea into 4 distinct image concepts, each with a ready-to-paste prompt for the chosen image model.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "idea": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Short idea, e.g. 'rainy street'."
+            },
+            "model": {
+              "type": "string",
+              "enum": [
+                "gpt-image",
+                "gemini",
+                "midjourney",
+                "flux"
+              ],
+              "description": "Target image model."
+            },
+            "style": {
+              "description": "Optional visual style; omit to let the AI choose.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "Photorealistic",
+                    "Cinematic",
+                    "Portrait",
+                    "Product shot",
+                    "Anime / Illustration",
+                    "Viral Instagram look"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "idea",
+            "model"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_models_and_styles",
+        "title": "List models and styles",
+        "description": "List the supported image models (with tips) and visual styles for prompt generation.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
