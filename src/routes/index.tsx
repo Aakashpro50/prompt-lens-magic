@@ -135,7 +135,7 @@ function PromptLens() {
     setLoading(true);
     setError(null);
     setResults([]);
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 50);
     try {
       const res = await generatePrompts({
         data: { idea: finalIdea, model: finalModel, style: finalStyle, variation },
@@ -271,7 +271,7 @@ function PromptLens() {
           </div>
 
           {/* Generate — sticky on mobile */}
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 p-3 backdrop-blur sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background p-3 sm:static sm:mt-8 sm:border-0 sm:p-0">
             <button
               onClick={() => void generate()}
               disabled={!idea.trim() || loading}
@@ -317,7 +317,7 @@ function PromptLens() {
                       setIdea(h.idea);
                       setModel(h.model);
                       setStyle(h.style);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      window.scrollTo({ top: 0, behavior: "auto" });
                     }}
                     className={`flex min-h-9 items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 ${focusRing}`}
                   >
@@ -394,8 +394,8 @@ function PromptLens() {
               {results.map((item, i) => (
                 <article
                   key={`${lastRun?.variation}-${i}`}
-                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5"
-                  style={{ animationDelay: `${i * 90}ms` }}
+                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5 [content-visibility:auto] [contain-intrinsic-size:auto_320px]"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
