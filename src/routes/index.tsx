@@ -271,7 +271,7 @@ function PromptLens() {
           </div>
 
           {/* Generate — sticky on mobile */}
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 p-3 backdrop-blur sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background p-3 sm:static sm:mt-8 sm:border-0 sm:p-0">
             <button
               onClick={() => void generate()}
               disabled={!idea.trim() || loading}
