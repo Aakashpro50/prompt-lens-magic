@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Check, Copy, Dices, History, Sparkles, Wand2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy, CopyCheck, Dices, History, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { generatePrompts } from "@/lib/generate.functions";
 import { MODELS, STYLES, SURPRISE_IDEAS, type ModelId, type StyleName } from "@/lib/models";
@@ -31,58 +32,117 @@ export const Route = createFileRoute("/")({
 interface HistoryEntry {
   idea: string;
   model: ModelId;
-  style: StyleName;
+  style: StyleName | null;
+}
+
+interface Settings {
+  model: ModelId;
+  style: StyleName | null;
 }
 
 const HISTORY_KEY = "promptlens-history";
+const SETTINGS_KEY = "promptlens-settings";
+const ANGLE_LABELS = ["Close-up", "Wide shot", "Creative twist", "Emotional"];
 
-function loadHistory(): HistoryEntry[] {
+function readJSON<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(0, 8) : [];
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
-    return [];
+    return null;
   }
 }
+
+function writeJSON(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage unavailable — ignore
+  }
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function PromptLens() {
   const [idea, setIdea] = useState("");
   const [model, setModel] = useState<ModelId>("gpt-image");
-  const [style, setStyle] = useState<StyleName>("Cinematic");
+  const [style, setStyle] = useState<StyleName | null>("Cinematic");
   const [results, setResults] = useState<IdeaPrompt[]>([]);
+  const [lastRun, setLastRun] = useState<{ idea: string; model: ModelId; style: StyleName | null; variation: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | "all" | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const resultsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    setHistory(loadHistory());
+    const h = readJSON<HistoryEntry[]>(HISTORY_KEY);
+    if (Array.isArray(h)) setHistory(h.slice(0, 8));
+    const s = readJSON<Settings>(SETTINGS_KEY);
+    if (s && MODELS.some((m) => m.id === s.model)) {
+      setModel(s.model);
+      setStyle(s.style && (STYLES as readonly string[]).includes(s.style) ? s.style : null);
+    }
   }, []);
+
+  useEffect(() => {
+    writeJSON(SETTINGS_KEY, { model, style });
+  }, [model, style]);
 
   const activeModel = MODELS.find((m) => m.id === model)!;
 
   const saveHistory = (entry: HistoryEntry) => {
-    const next = [entry, ...history.filter((h) => h.idea !== entry.idea)].slice(0, 8);
-    setHistory(next);
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    } catch {
-      // storage unavailable — ignore
-    }
+    setHistory((prev) => {
+      const next = [entry, ...prev.filter((h) => h.idea.toLowerCase() !== entry.idea.toLowerCase())].slice(0, 8);
+      writeJSON(HISTORY_KEY, next);
+      return next;
+    });
   };
 
-  const generate = async (overrideIdea?: string) => {
-    const finalIdea = (overrideIdea ?? idea).trim();
+  const clearHistory = () => {
+    setHistory([]);
+    writeJSON(HISTORY_KEY, []);
+  };
+
+  const generate = async (opts?: { idea?: string; model?: ModelId; style?: StyleName | null; variation?: number }) => {
+    const finalIdea = (opts?.idea ?? idea).trim();
+    const finalModel = opts?.model ?? model;
+    const finalStyle = opts?.style !== undefined ? opts.style : style;
+    const variation = opts?.variation ?? 0;
     if (!finalIdea || loading) return;
     setLoading(true);
     setError(null);
     setResults([]);
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     try {
-      const res = await generatePrompts({ data: { idea: finalIdea, model, style } });
+      const res = await generatePrompts({
+        data: { idea: finalIdea, model: finalModel, style: finalStyle, variation },
+      });
       setResults(res.ideas);
-      saveHistory({ idea: finalIdea, model, style });
+      setLastRun({ idea: finalIdea, model: finalModel, style: finalStyle, variation });
+      saveHistory({ idea: finalIdea, model: finalModel, style: finalStyle });
     } catch {
       setError("Kuch gadbad ho gayi — generation failed. Please try again.");
     } finally {
@@ -91,32 +151,33 @@ function PromptLens() {
   };
 
   const surprise = () => {
-    const pick = SURPRISE_IDEAS[Math.floor(Math.random() * SURPRISE_IDEAS.length)]!;
+    const options = SURPRISE_IDEAS.filter((s) => s !== idea);
+    const pick = options[Math.floor(Math.random() * options.length)]!;
     setIdea(pick);
+    void generate({ idea: pick });
   };
 
-  const copyPrompt = async (text: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
+  const copyPrompt = async (text: string, index: number | "all") => {
+    const ok = await copyText(text);
+    if (!ok) {
+      toast.error("Copy nahi hua — please select and copy manually.");
+      return;
     }
+    toast.success(index === "all" ? "All 4 prompts copied!" : "Prompt copied!");
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex((cur) => (cur === index ? null : cur)), 1800);
   };
 
+  const lastModel = lastRun ? MODELS.find((m) => m.id === lastRun.model)! : null;
+  const showResultsArea = loading || results.length > 0;
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-10 sm:pt-16">
+    <div className="min-h-dvh bg-background">
+      <div className="mx-auto w-full max-w-2xl px-4 pb-28 pt-10 sm:pb-24 sm:pt-16">
         {/* Header */}
         <header className="animate-fade-up">
           <div className="flex items-center gap-2 text-primary">
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" aria-hidden />
             <span className="text-xs font-semibold uppercase tracking-[0.25em]">PromptLens</span>
           </div>
           <h1 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
@@ -129,38 +190,47 @@ function PromptLens() {
         </header>
 
         {/* Input */}
-        <section className="mt-10 animate-fade-up" style={{ animationDelay: "80ms" }}>
+        <section className="mt-8 animate-fade-up sm:mt-10" style={{ animationDelay: "80ms" }}>
+          <label htmlFor="idea" className="sr-only">
+            Your idea
+          </label>
           <div className="flex gap-2">
             <input
+              id="idea"
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void generate();
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) void generate();
               }}
               placeholder='e.g. "rainy street", "ganesh ji", "street food"'
               maxLength={120}
-              className="h-12 flex-1 rounded-xl border border-input bg-card px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              enterKeyHint="go"
+              autoComplete="off"
+              className="h-12 min-w-0 flex-1 rounded-xl border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:text-sm"
             />
             <button
               onClick={surprise}
+              disabled={loading}
+              aria-label="Surprise me with a random idea"
               title="Surprise me"
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-input bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-input bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40 ${focusRing}`}
             >
-              <Dices className="h-5 w-5" />
+              <Dices className="h-5 w-5" aria-hidden />
             </button>
           </div>
 
           {/* Model picker */}
           <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <p id="model-label" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Image model
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div role="group" aria-labelledby="model-label" className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {MODELS.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setModel(m.id)}
-                  className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  aria-pressed={model === m.id}
+                  className={`min-h-14 rounded-xl border px-3 py-2.5 text-left transition-colors ${focusRing} ${
                     model === m.id
                       ? "border-primary bg-primary/10 text-foreground"
                       : "border-input bg-card text-muted-foreground hover:border-primary/30"
@@ -172,22 +242,23 @@ function PromptLens() {
               ))}
             </div>
             <p className="mt-2.5 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Wand2 className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+              <Wand2 className="mt-0.5 h-3 w-3 shrink-0 text-primary" aria-hidden />
               {activeModel.tip}
             </p>
           </div>
 
           {/* Style picker */}
           <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Style <span className="normal-case tracking-normal">(optional)</span>
+            <p id="style-label" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Style <span className="normal-case tracking-normal">(optional — tap again to clear)</span>
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div role="group" aria-labelledby="style-label" className="mt-3 flex flex-wrap gap-2">
               {STYLES.map((s) => (
                 <button
                   key={s}
-                  onClick={() => setStyle(s)}
-                  className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                  onClick={() => setStyle((cur) => (cur === s ? null : s))}
+                  aria-pressed={style === s}
+                  className={`min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${focusRing} ${
                     style === s
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
@@ -199,102 +270,174 @@ function PromptLens() {
             </div>
           </div>
 
-          <button
-            onClick={() => void generate()}
-            disabled={!idea.trim() || loading}
-            className="mt-8 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 text-sm font-bold uppercase tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
-                Soch rahe hain…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                Generate prompts
-              </>
-            )}
-          </button>
+          {/* Generate — sticky on mobile */}
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 p-3 backdrop-blur sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+            <button
+              onClick={() => void generate()}
+              disabled={!idea.trim() || loading}
+              className={`mx-auto flex w-full max-w-2xl items-center justify-center gap-2 rounded-xl bg-primary py-4 text-sm font-bold uppercase tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
+            >
+              {loading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                  Soch rahe hain…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                  Generate prompts
+                </>
+              )}
+            </button>
+          </div>
         </section>
 
         {/* History */}
-        {history.length > 0 && !loading && results.length === 0 && (
-          <section className="mt-10 animate-fade-up">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              <History className="h-3.5 w-3.5" /> Recent
-            </p>
+        {history.length > 0 && (
+          <section className="mt-10 animate-fade-up" aria-label="Recent ideas">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                <History className="h-3.5 w-3.5" aria-hidden /> Recent
+              </p>
+              <button
+                onClick={clearHistory}
+                className={`flex items-center gap-1 rounded text-xs text-muted-foreground hover:text-foreground ${focusRing}`}
+              >
+                <X className="h-3 w-3" aria-hidden /> Clear
+              </button>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {history.map((h) => (
-                <button
-                  key={h.idea}
-                  onClick={() => {
-                    setIdea(h.idea);
-                    setModel(h.model);
-                    setStyle(h.style);
-                    void generate(h.idea);
-                  }}
-                  className="rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                >
-                  {h.idea}
-                </button>
-              ))}
+              {history.map((h) => {
+                const hm = MODELS.find((m) => m.id === h.model);
+                return (
+                  <button
+                    key={h.idea}
+                    disabled={loading}
+                    onClick={() => {
+                      setIdea(h.idea);
+                      setModel(h.model);
+                      setStyle(h.style);
+                      void generate({ idea: h.idea, model: h.model, style: h.style });
+                    }}
+                    className={`flex min-h-9 items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 ${focusRing}`}
+                  >
+                    {h.idea}
+                    {hm && <span className="text-[10px] uppercase tracking-wider text-primary">{hm.short}</span>}
+                  </button>
+                );
+              })}
             </div>
           </section>
         )}
 
         {error && (
-          <p className="mt-8 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p role="alert" className="mt-8 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </p>
         )}
 
         {/* Results */}
-        {results.length > 0 && (
-          <section className="mt-12 space-y-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              4 ideas for “{idea}” · {activeModel.name} · {style}
-            </p>
-            {results.map((item, i) => (
-              <article
-                key={i}
-                className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5"
-                style={{ animationDelay: `${i * 90}ms` }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-display text-lg font-semibold leading-snug text-foreground">
-                    <span className="mr-2 text-sm text-primary">{String(i + 1).padStart(2, "0")}</span>
-                    {item.idea}
-                  </h2>
-                  <button
-                    onClick={() => void copyPrompt(item.prompt, i)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      copiedIndex === i
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-secondary text-secondary-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {copiedIndex === i ? (
-                      <>
-                        <Check className="h-3.5 w-3.5" /> Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" /> Copy
-                      </>
-                    )}
-                  </button>
+        <section ref={resultsRef} aria-live="polite" aria-busy={loading} className="scroll-mt-6">
+          {showResultsArea && (
+            <div className="mt-12 space-y-5">
+              {results.length > 0 && lastRun && lastModel && (
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">4 ideas for</p>
+                    <h2 className="mt-1 font-display text-2xl font-semibold text-foreground">“{lastRun.idea}”</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {lastModel.name} · {lastRun.style ?? "Any style"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        void generate({ ...lastRun, variation: lastRun.variation + 1 })
+                      }
+                      className={`flex min-h-9 items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 ${focusRing}`}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Regenerate
+                    </button>
+                    <button
+                      onClick={() =>
+                        void copyPrompt(
+                          results.map((r, i) => `${i + 1}. ${r.idea}\n${r.prompt}`).join("\n\n"),
+                          "all",
+                        )
+                      }
+                      className={`flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${focusRing} ${
+                        copiedIndex === "all"
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-card text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {copiedIndex === "all" ? (
+                        <CopyCheck className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {copiedIndex === "all" ? "Copied!" : "Copy all"}
+                    </button>
+                  </div>
                 </div>
-                <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-border bg-code p-4 font-mono text-[13px] leading-relaxed text-code-foreground">
-                  {item.prompt}
-                </pre>
-              </article>
-            ))}
-          </section>
-        )}
+              )}
 
-        <footer className="mt-20 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-          PromptLens · Banaya gaya pyaar se · Free forever, no accounts
+              {loading &&
+                [0, 1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse rounded-2xl border border-border bg-card p-5" aria-hidden>
+                    <div className="h-3 w-20 rounded bg-muted" />
+                    <div className="mt-3 h-5 w-3/4 rounded bg-muted" />
+                    <div className="mt-4 h-24 rounded-xl bg-muted/60" />
+                  </div>
+                ))}
+
+              {results.map((item, i) => (
+                <article
+                  key={`${lastRun?.variation}-${i}`}
+                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5"
+                  style={{ animationDelay: `${i * 90}ms` }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary">
+                        {String(i + 1).padStart(2, "0")} · {ANGLE_LABELS[i] ?? "Idea"}
+                      </span>
+                      <h3 className="mt-1.5 font-display text-lg font-semibold leading-snug text-foreground">
+                        {item.idea}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => void copyPrompt(item.prompt, i)}
+                      aria-label={`Copy prompt ${i + 1}`}
+                      className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${focusRing} ${
+                        copiedIndex === i
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-secondary text-secondary-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {copiedIndex === i ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" aria-hidden /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" aria-hidden /> Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="mt-4 max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-code p-4 font-mono text-[13px] leading-relaxed text-code-foreground">
+                    {item.prompt}
+                  </pre>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <footer className="mt-20 border-t border-border pt-6 text-center text-xs leading-relaxed text-muted-foreground">
+          <p>Tip: copy a prompt, paste it in your image tool, and tweak one detail at a time.</p>
+          <p className="mt-2">PromptLens · Banaya gaya pyaar se · Free forever, no accounts</p>
         </footer>
       </div>
     </div>
